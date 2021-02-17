@@ -24,12 +24,12 @@ int main(void) {
     e_init_uart1();
     staller(4);
 
-    // rotate_bot();
+    rotate_bot();
 
-    int letter = 2;
+    int letter = 3;
     int letter_list[1] = {letter};
 
-    int first_robot = 1;
+    int first_robot = 0;
     if (first_robot) {
         talk(letter_list, 1);
         stall_ms(200000);
