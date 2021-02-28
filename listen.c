@@ -241,8 +241,8 @@ int get_m_code() {
         m_code[m_code_i] = 0;
     }
 
-    sprintf(buffer_db, "M: %d, %d, %d, %d, %d, %d\n", m_code[0], m_code[1], m_code[2], m_code[3], m_code[4], m_code[5]);
-    e_send_uart1_char(buffer_db, strlen(buffer_db));
+    // sprintf(buffer_db, "M: %d, %d, %d, %d, %d, %d\n", m_code[0], m_code[1], m_code[2], m_code[3], m_code[4], m_code[5]);
+    // e_send_uart1_char(buffer_db, strlen(buffer_db));
 
     max_similarity = -1;
     idx = 0;
