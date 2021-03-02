@@ -20,40 +20,6 @@
 
 
 int main(void) {
-    /*
-    e_init_port();
-    e_init_uart1();
-    staller(4);
-
-    // rotate_bot();
-
-
-    int letter = 3;
-    int letter_list[1] = {letter};
-
-    int first_robot = 0;
-    if (first_robot) {
-        talk(letter_list, 1);
-        stall_ms(200000);
-    }
-
-    int cntr = 0;
-
-    while (1) {
-        letter = listen();
-        letter = 19;
-        letter_list[0] = letter;
-        stall_ms(200000);
-        talk(letter_list, 1);
-        stall_ms(200000);
-        cntr++;
-        if (cntr == 10) {
-            e_send_uart1_char("FIN\n", 4);
-        }
-    }
-    */
-
-
     char message[50];
     char command[10];
     int i, c;
@@ -86,7 +52,7 @@ int main(void) {
                 break;
             case 'l':
                 // listen
-                letter = listen();
+                listen();
                 sprintf(message, "ok-l");
                 e_send_uart1_char(message, strlen(message));
                 while (e_uart1_sending());

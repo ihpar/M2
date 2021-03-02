@@ -14,32 +14,28 @@
 
 extern int e_dci_unavailable;
 
-void talk(int letters[], int letter_count) {
+void talk(int *word, int max_word_len) {
     e_init_sound();
     e_ad_scan_off();
-    stall_ms(500000);
-    int i, j, current_letter;
-    for (i = 0; i < letter_count; i++) {
-        current_letter = letters[i];
-        for (j = 0; j < CODE_LEN; j++) {
-            if (alphabet[current_letter][j] < 0)
-                break;
+    staller(2);
 
-            while (e_dci_unavailable);
-
-            if (alphabet[current_letter][j] == 1) {
-                e_play_sound(SAMPLE_START, SHORT_BEEPD);    // short beep
-            } else {
-                e_play_sound(SAMPLE_START, LONG_BEEPD);     // long beep
-            }
-
-            stall_ms(SILENCE_CODES);
+    int i;
+    for (i = 0; i < max_word_len; i++) {
+        while (e_dci_unavailable);
+        if (word[i] == 2) {
+            e_play_sound(SAMPLE_START, LONG_BEEPD);     // long beep
         }
-
-        if (i < letter_count - 1)
-            stall_ms(SILENCE_LETTERS);
+        if (word[i] == 1) {
+            e_play_sound(SAMPLE_START, SHORT_BEEPD);    // short beep
+        }
+        if (word[i] == 0) {
+            break;
+        }
+        stall_ms(SILENCE_CODES);
     }
+
     e_close_sound();
+    stall_ms(SILENCE_LETTERS);
 }
 
 

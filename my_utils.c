@@ -42,3 +42,13 @@ int alphabet[ALPHABET_LEN][CODE_LEN] = {
         {2, 2,  1,  1,  -1, -1}     // Z
 };
 
+void create_random_word(int *word, int max_w_len, int complexity) {
+    int i;
+    int current_bit = -1,
+            last_bit = -1;
+
+    for (i = 0; i < complexity; i++) {
+        word[i] = 1;
+    }
+}
+

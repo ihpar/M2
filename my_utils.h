@@ -11,4 +11,6 @@ void staller(int dur);
 
 void stall_ms(long dur);
 
+int *create_random_word(int max_w_len, int complexity);
+
 #endif //EPUCKER_MY_UTILS_H

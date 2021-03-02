@@ -8,7 +8,6 @@
 #include "my_utils.h"
 #include "uart/e_uart_char.h"
 
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
 
@@ -20,13 +19,10 @@
 #define L_DUR 18
 #define S_DUR 4
 
+extern int e_mic_scan[3][MIC_SAMP_NB]; // Array to store the mic values
+extern unsigned int e_last_mic_scan_id; // ID of the last scan in the mic array
+extern unsigned char is_ad_acquisition_completed; // Check if the acquisition is done
 
-extern int e_mic_scan[3][MIC_SAMP_NB];                //Array to store the mic values
-extern unsigned int e_last_mic_scan_id;                //ID of the last scan in the mic array
-extern unsigned char is_ad_acquisition_completed;    //to check if the acquisition is done
-
-
-char buffer_db[200];
 int last_avg = 0;
 int not_evt_cnt = 0;
 int last_avgs[LST_AV_CT];
@@ -37,12 +33,10 @@ int dur = 0;
 int is_first = 1;
 int d_cnt = 0;
 
-
 struct state {
     int is_on;
     int offset;
 };
-
 
 struct node {
     struct state st;
@@ -50,16 +44,15 @@ struct node {
 };
 struct node *start = NULL;
 
-
-void insert_at_end(struct state x) {
+void append_state_node(struct state s) {
     struct node *t, *temp;
 
     t = (struct node *) malloc(sizeof(struct node));
 
     if (start == NULL) {
         start = t;
-        start->st.offset = x.offset;
-        start->st.is_on = x.is_on;
+        start->st.offset = s.offset;
+        start->st.is_on = s.is_on;
         start->next = NULL;
         return;
     }
@@ -70,13 +63,12 @@ void insert_at_end(struct state x) {
         temp = temp->next;
 
     temp->next = t;
-    t->st.offset = x.offset;
-    t->st.is_on = x.is_on;
+    t->st.offset = s.offset;
+    t->st.is_on = s.is_on;
     t->next = NULL;
 }
 
-
-void delete_ll() {
+void delete_states_ll() {
     struct node *temp;
 
     while (start != NULL) {
@@ -86,29 +78,6 @@ void delete_ll() {
         free(temp);
     }
 }
-
-
-void send_s_data() {
-    sprintf(buffer_db, "C:%d\n", d_cnt);
-    e_send_uart1_char(buffer_db, strlen(buffer_db));
-
-    struct node *t;
-
-    t = start;
-
-    if (t == NULL) {
-        return;
-    }
-
-    while (t != NULL) {
-        sprintf(buffer_db, "%d, %d\n", t->st.is_on, t->st.offset);
-        e_send_uart1_char(buffer_db, strlen(buffer_db));
-        t = t->next;
-    }
-
-    e_send_uart1_char("done\n", 5);
-}
-
 
 int tidy_signal(void) {
     while (!e_ad_is_array_filled());
@@ -144,7 +113,7 @@ int tidy_signal(void) {
                 st.offset = 0;
                 is_first = 0;
             }
-            insert_at_end(st);
+            append_state_node(st);
             d_cnt++;
             dur = 0;
             last_state = 1;
@@ -169,7 +138,7 @@ int tidy_signal(void) {
             if (last_state == 1) {
                 st.is_on = 0;
                 st.offset = dur;
-                insert_at_end(st);
+                append_state_node(st);
                 d_cnt++;
                 dur = 0;
                 last_state = 0;
@@ -182,19 +151,7 @@ int tidy_signal(void) {
     return 1;
 }
 
-int find_similarity(int r[], int m[]) {
-    int i, score = 0;
-    for (i = 0; i < CODE_LEN; i++) {
-        if (r[i] == m[i]) {
-            score += 1;
-        } else {
-            score -= 1;
-        }
-    }
-    return score;
-}
-
-int get_m_code() {
+void get_m_code(int *m_code, int max_word_len) {
     int idx, is_on, offset, on_dur, m_code_i, i, max_similarity, similarity;
     struct node *t;
     if (start == NULL || start->next == NULL) {
@@ -202,8 +159,6 @@ int get_m_code() {
     }
 
     t = start->next;
-
-    int m_code[CODE_LEN] = {-1, -1, -1, -1, -1, -1};
 
     on_dur = 0;
     m_code_i = 0;
@@ -240,25 +195,9 @@ int get_m_code() {
         //return -1;
         m_code[m_code_i] = 0;
     }
-
-    // sprintf(buffer_db, "M: %d, %d, %d, %d, %d, %d\n", m_code[0], m_code[1], m_code[2], m_code[3], m_code[4], m_code[5]);
-    // e_send_uart1_char(buffer_db, strlen(buffer_db));
-
-    max_similarity = -1;
-    idx = 0;
-    for (i = 0; i < ALPHABET_LEN; i++) {
-        similarity = find_similarity(m_code, alphabet[i]);
-        if (similarity > max_similarity) {
-            max_similarity = similarity;
-            idx = i;
-        }
-    }
-
-    return idx;
 }
 
-
-void init() {
+void init_listening() {
     dur = 0;
     is_first = 1;
     d_cnt = 0;
@@ -278,17 +217,16 @@ void init() {
     stall_ms(300000);
 }
 
-int listen() {
+void listen() {
     int letter_index = 0;
-    init();
+    init_listening();
     LED2 = 1;
     while (tidy_signal());
     e_ad_scan_off();
-    letter_index = get_m_code();
-    // send_s_data();
-    delete_ll();
+    int *m_code = (int *) calloc(max_word_len, sizeof(int));
+    get_m_code(m_code, 12);
+    delete_states_ll();
     LED2 = 0;
-    return letter_index;
 }
 
 
