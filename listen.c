@@ -217,7 +217,7 @@ void init_listening() {
     stall_ms(300000);
 }
 
-void listen() {
+void listen(int *heard_word, int max_word_len) {
     int letter_index = 0;
     init_listening();
     LED2 = 1;
