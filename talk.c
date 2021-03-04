@@ -17,7 +17,7 @@ extern int e_dci_unavailable;
 void talk(int *word, int max_word_len) {
     e_init_sound();
     e_ad_scan_off();
-    staller(2);
+    staller(1);
 
     int i;
     for (i = 0; i < max_word_len; i++) {

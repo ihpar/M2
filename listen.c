@@ -153,18 +153,19 @@ int tidy_signal(void) {
 
 void get_m_code(int *m_code, int max_word_len) {
     int idx, is_on, offset, on_dur, m_code_i, i, max_similarity, similarity;
-    struct node *t;
+    struct node *temp;
     if (start == NULL || start->next == NULL) {
-        return -1;
+        return;
     }
 
-    t = start->next;
+    temp = start->next;
 
     on_dur = 0;
     m_code_i = 0;
-    while (t != NULL) {
-        is_on = t->st.is_on;
-        offset = t->st.offset;
+    while ((temp != NULL) && (m_code_i < max_word_len)) {
+
+        is_on = temp->st.is_on;
+        offset = temp->st.offset;
 
         if (is_on == 0) {
             on_dur += offset;
@@ -178,22 +179,26 @@ void get_m_code(int *m_code, int max_word_len) {
                     m_code[m_code_i] = 1;
                 } else {
                     //return -1;
-                    m_code[m_code_i] = 0;
+                    // m_code[m_code_i] = 0;
+                    m_code[m_code_i] = 1;
                 }
                 on_dur = 0;
                 m_code_i++;
             }
         }
-        t = t->next;
+        temp = temp->next;
     }
 
-    if (on_dur >= L_DUR) {
-        m_code[m_code_i] = 2;
-    } else if (on_dur >= S_DUR) {
-        m_code[m_code_i] = 1;
-    } else {
-        //return -1;
-        m_code[m_code_i] = 0;
+    if (m_code_i < max_word_len) {
+        if (on_dur >= L_DUR) {
+            m_code[m_code_i] = 2;
+        } else if (on_dur >= S_DUR) {
+            m_code[m_code_i] = 1;
+        } else {
+            //return -1;
+            // m_code[m_code_i] = 0;
+            m_code[m_code_i] = 1;
+        }
     }
 }
 
@@ -218,13 +223,11 @@ void init_listening() {
 }
 
 void listen(int *heard_word, int max_word_len) {
-    int letter_index = 0;
     init_listening();
     LED2 = 1;
     while (tidy_signal());
     e_ad_scan_off();
-    int *m_code = (int *) calloc(max_word_len, sizeof(int));
-    get_m_code(m_code, 12);
+    get_m_code(heard_word, max_word_len);
     delete_states_ll();
     LED2 = 0;
 }
