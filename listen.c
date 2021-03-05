@@ -32,6 +32,8 @@ int last_state = 0;
 int dur = 0;
 int is_first = 1;
 int d_cnt = 0;
+int watch_dog = 0;
+char err_message[50];
 
 struct state {
     int is_on;
@@ -48,6 +50,12 @@ void append_state_node(struct state s) {
     struct node *t, *temp;
 
     t = (struct node *) malloc(sizeof(struct node));
+    if (t == NULL) {
+        sprintf(err_message, "state t is null A\n");
+        e_send_uart1_char(err_message, strlen(err_message));
+        while (e_uart1_sending());
+        return;
+    }
 
     if (start == NULL) {
         start = t;
@@ -103,6 +111,13 @@ int tidy_signal(void) {
         }
     }
 
+    if (watch_dog > 500) {
+        sprintf(err_message, "watch dog timeout A\n");
+        e_send_uart1_char(err_message, strlen(err_message));
+        while (e_uart1_sending());
+        return 0;
+    }
+
     if (last_avg + last_avg * NOISE_RATIO < avg || last_avg - last_avg * NOISE_RATIO > avg) {
         // event detected
         if (last_state == 0) {
@@ -116,6 +131,7 @@ int tidy_signal(void) {
             append_state_node(st);
             d_cnt++;
             dur = 0;
+            watch_dog = 0;
             last_state = 1;
         }
     } else { // not event
@@ -148,6 +164,7 @@ int tidy_signal(void) {
     }
 
     dur++;
+    watch_dog++;
     return 1;
 }
 
@@ -205,6 +222,7 @@ void get_m_code(int *m_code, int max_word_len) {
 void init_listening() {
     dur = 0;
     is_first = 1;
+    watch_dog = 0;
     d_cnt = 0;
     last_avg = 0;
     not_evt_cnt = 0;

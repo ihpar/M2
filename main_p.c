@@ -78,6 +78,12 @@ int insert_word_node(struct word_node wn, int max_word_len) {
 
     t = (struct word_ll *) malloc(sizeof(struct word_ll));
 
+    if (t == NULL) {
+        e_send_uart1_char("Insert null X\n", 14);
+        while (e_uart1_sending());
+        return 0;
+    }
+
     if (word_head == NULL) {
         // memory is empty, add new word to beginning
         word_head = t;
@@ -130,45 +136,6 @@ int insert_word_node(struct word_node wn, int max_word_len) {
         temp->next = t;
         t->next = NULL;
         return 1; // 1 new word added
-    }
-}
-
-void delete_word_ll() {
-    struct word_ll *temp;
-
-    while (word_head != NULL) {
-        temp = word_head;
-        word_head = word_head->next;
-
-        free(temp);
-    }
-}
-
-void print_word_ll(int max_word_len) {
-    int i;
-    struct word_ll *temp = word_head;
-    while (temp != NULL) {
-        for (i = 0; i < max_word_len; i++) {
-            printf("%d ", temp->elem.word[i]);
-        }
-        printf("count: %d\n", temp->elem.count);
-        temp = temp->next;
-    }
-}
-
-void get_words_memory_contents(char *log, int max_word_len) {
-    int i;
-    struct word_ll *temp = word_head;
-    char *word_str = (char *) malloc((max_word_len) * sizeof(char));
-    char *line = (char *) malloc((max_word_len + 7) * sizeof(char));
-
-    while (temp != NULL) {
-        for (i = 0; i < max_word_len; i++) {
-            sprintf(&word_str[i], "%d", temp->elem.word[i]);
-        }
-        sprintf(line, "M:%s-%d\n", word_str, temp->elem.count);
-        strcat(log, line);
-        temp = temp->next;
     }
 }
 
@@ -228,21 +195,36 @@ void random_w_choose(int *result, int max_word_len) {
     }
 }
 
-void prepare_word_message(char *message, int *word, int max_word_len, int action) {
-    char *word_str = (char *) malloc((max_word_len + 1) * sizeof(char));
+void send_words_memory_contents(char *word_str, char *line, int max_word_len) {
+    int i;
+    struct word_ll *temp = word_head;
+
+    while (temp != NULL) {
+        for (i = 0; i < max_word_len; i++) {
+            sprintf(&word_str[i], "%d", temp->elem.word[i]);
+        }
+        sprintf(line, "M:%s-%d\n", word_str, temp->elem.count);
+        temp = temp->next;
+        e_send_uart1_char(line, strlen(line));
+        while (e_uart1_sending());
+    }
+}
+
+void send_word_message(char *message, char *word_str, int *word, int max_word_len, int action) {
     int i;
     for (i = 0; i < max_word_len; i++) {
         sprintf(&word_str[i], "%d", word[i]);
     }
-    word_str[max_word_len] = '\0';
+
     if (action == 1) {
-        strcpy(message, "LW:");
+        sprintf(message, "LW:%sX\n", word_str);
     }
     if (action == 2) {
-        strcpy(message, "SW:");
+        sprintf(message, "SW:%sX\n", word_str);
     }
-    strcat(message, word_str);
-    strcat(message, "X\n");
+
+    e_send_uart1_char(message, strlen(message));
+    while (e_uart1_sending());
 }
 
 int main(void) {
@@ -254,7 +236,7 @@ int main(void) {
     char command[10];
     int i, c, rand_seed;
     int def_comm_count = 1;
-    char *c_dummy, *mem_dump;
+    char *c_dummy;
 
     int max_syl_len = 3;
     int complexity = 4;
@@ -263,6 +245,9 @@ int main(void) {
 
     int *heard_word = (int *) calloc(max_word_len, sizeof(int));
     int *random_chosen_word = (int *) calloc(max_word_len, sizeof(int));
+
+    char *word_str = (char *) malloc((max_word_len) * sizeof(char));
+    char *line = (char *) malloc((max_word_len + 7) * sizeof(char));
 
     struct word_node wn;
 
@@ -283,7 +268,7 @@ int main(void) {
             case 'i':
                 // stay idle
                 // notify PC that I'm done
-                sprintf(message, "ok-iX\n");
+                sprintf(message, "ok-i ABX\n");
                 e_send_uart1_char(message, strlen(message));
                 while (e_uart1_sending());
                 break;
@@ -293,8 +278,19 @@ int main(void) {
                     heard_word[i] = 0;
                 }
 
+                sprintf(message, "listen A\n");
+                e_send_uart1_char(message, strlen(message));
+                while (e_uart1_sending());
                 // listen for the spoken word
                 listen(heard_word, max_word_len);
+
+                sprintf(message, "listen done B\n");
+                e_send_uart1_char(message, strlen(message));
+                while (e_uart1_sending());
+
+                if (heard_word[0] == 0) {
+                    random_w_choose(heard_word, max_word_len);
+                }
                 for (i = 0; i < max_word_len; i++) {
                     wn.word[i] = heard_word[i];
                 }
@@ -302,31 +298,24 @@ int main(void) {
                 // insert heard word to memory
                 num_words_in_memory += insert_word_node(wn, max_word_len);
 
-                // notify PC that I'm done
-                mem_dump = (char *) calloc((num_words_in_memory + 1) * (max_word_len + 7), sizeof(char));
-                get_words_memory_contents(mem_dump, max_word_len);
-                prepare_word_message(message, heard_word, max_word_len, 1);
-                strcat(mem_dump, message);
-
-                e_send_uart1_char(mem_dump, strlen(mem_dump));
-                while (e_uart1_sending());
-                free(mem_dump);
+                send_words_memory_contents(word_str, line, max_word_len);
+                send_word_message(message, word_str, heard_word, max_word_len, 1);
                 break;
             case 's': // speak
                 // choose a random word from memory
                 random_w_choose(random_chosen_word, max_word_len);
                 // speak the chosen word
+                sprintf(message, "speak A\n");
+                e_send_uart1_char(message, strlen(message));
+                while (e_uart1_sending());
                 talk(random_chosen_word, max_word_len);
 
-                // notify PC that I'm done
-                mem_dump = (char *) calloc((num_words_in_memory + 1) * (max_word_len + 7), sizeof(char));
-                get_words_memory_contents(mem_dump, max_word_len);
-                prepare_word_message(message, random_chosen_word, max_word_len, 2);
-                strcat(mem_dump, message);
-
-                e_send_uart1_char(mem_dump, strlen(mem_dump));
+                sprintf(message, "speak done B\n");
+                e_send_uart1_char(message, strlen(message));
                 while (e_uart1_sending());
-                free(mem_dump);
+
+                send_words_memory_contents(word_str, line, max_word_len);
+                send_word_message(message, word_str, random_chosen_word, max_word_len, 2);
                 break;
             default:
                 // default: echo the command back
@@ -344,7 +333,7 @@ int main(void) {
                     num_words_in_memory += insert_word_node(wn, max_word_len);
                 }
                 def_comm_count++;
-                strcat(command, "X\n");
+                strcat(command, "ABX\n");
                 e_send_uart1_char(command, strlen(command));
                 while (e_uart1_sending());
                 break;
