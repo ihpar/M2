@@ -143,32 +143,36 @@ void choose_random_word(char *result) {
     }
 }
 
-void send_words_memory_contents(char *word_str, char *line) {
-    int i, j;
+void send_words_memory_contents() {
+    int i;
+    char word_str[MAX_WORD_LEN + 2];
+    char line[MAX_WORD_LEN + 9];
+
     for (i = 0; i < word_node_count; i++) {
-        for (j = 0; j < MAX_WORD_LEN; j++) {
-            sprintf(&word_str[j], "%c", memory[i].word[j]);
-        }
+        sprintf(word_str, "%s", memory[i].word);
+        word_str[MAX_WORD_LEN] = '\0';
         sprintf(line, "M:%s-%d\n", word_str, memory[i].count);
+
         e_send_uart1_char(line, strlen(line));
         while (e_uart1_sending());
     }
 }
 
-void send_word_message(char *message, char *word_str, char *word, int action) {
-    int i;
-    for (i = 0; i < MAX_WORD_LEN; i++) {
-        sprintf(&word_str[i], "%c", word[i]);
-    }
+void send_word_message(char *word, int action) {
+    char word_str[MAX_WORD_LEN + 2];
+    char line[MAX_WORD_LEN + 9];
+
+    sprintf(word_str, "%s", word);
+    word_str[MAX_WORD_LEN] = '\0';
 
     if (action == 1) {
-        sprintf(message, "LW:%sX\n", word_str);
+        sprintf(line, "LW:%sX\n", word_str);
     }
     if (action == 2) {
-        sprintf(message, "SW:%sX\n", word_str);
+        sprintf(line, "SW:%sX\n", word_str);
     }
 
-    e_send_uart1_char(message, strlen(message));
+    e_send_uart1_char(line, strlen(line));
     while (e_uart1_sending());
 }
 
@@ -189,9 +193,6 @@ int main(void) {
 
     char heard_word[MAX_WORD_LEN];
     char random_chosen_word[MAX_WORD_LEN];
-
-    char word_str[MAX_WORD_LEN];
-    char line[MAX_WORD_LEN + 7];
 
     struct word_node wn;
 
@@ -233,8 +234,12 @@ int main(void) {
                 while (e_uart1_sending());
 
                 if (heard_word[0] == '0') {
+                    sprintf(message, "zero word X\n");
+                    e_send_uart1_char(message, strlen(message));
+                    while (e_uart1_sending());
                     choose_random_word(heard_word);
                 }
+
                 for (i = 0; i < MAX_WORD_LEN; i++) {
                     wn.word[i] = heard_word[i];
                 }
@@ -242,8 +247,8 @@ int main(void) {
                 // insert heard word to memory
                 num_words_in_memory += insert_word_node(wn);
 
-                send_words_memory_contents(word_str, line);
-                send_word_message(message, word_str, heard_word, 1);
+                send_words_memory_contents();
+                send_word_message(heard_word, 1);
                 break;
             case 's': // speak
                 // choose a random word from memory
@@ -258,8 +263,8 @@ int main(void) {
                 e_send_uart1_char(message, strlen(message));
                 while (e_uart1_sending());
 
-                send_words_memory_contents(word_str, line);
-                send_word_message(message, word_str, random_chosen_word, 2);
+                send_words_memory_contents();
+                send_word_message(random_chosen_word, 2);
                 break;
             default:
                 // default: echo the command back
