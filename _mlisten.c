@@ -1,4 +1,6 @@
+/*
 #include "stdio.h"
+#include "stdlib.h"
 #include "string.h"
 
 #include "epuck_ports.h"
@@ -17,7 +19,6 @@
 #define EPS_ERR 3
 #define L_DUR 18
 #define S_DUR 4
-#define STATE_NODE_LIMIT 60
 
 extern int e_mic_scan[3][MIC_SAMP_NB]; // Array to store the mic values
 extern unsigned int e_last_mic_scan_id; // ID of the last scan in the mic array
@@ -41,15 +42,52 @@ struct state {
     int offset;
 };
 
-struct state states[STATE_NODE_LIMIT];
+struct node {
+    struct state st;
+    struct node *next;
+};
+struct node *start = NULL;
 
 void append_state_node(struct state s) {
-    if (state_node_count == STATE_NODE_LIMIT) {
+    state_node_count++;
+    struct node *t, *temp;
+
+    t = (struct node *) malloc(sizeof(struct node));
+    if (t == NULL) {
+        sprintf(err_message, "state t is null A\n");
+        e_send_uart1_char(err_message, strlen(err_message));
+        while (e_uart1_sending());
         return;
     }
-    states[state_node_count].offset = s.offset;
-    states[state_node_count].is_on = s.is_on;
-    state_node_count++;
+
+    if (start == NULL) {
+        start = t;
+        start->st.offset = s.offset;
+        start->st.is_on = s.is_on;
+        start->next = NULL;
+        return;
+    }
+
+    temp = start;
+
+    while (temp->next != NULL)
+        temp = temp->next;
+
+    temp->next = t;
+    t->st.offset = s.offset;
+    t->st.is_on = s.is_on;
+    t->next = NULL;
+}
+
+void delete_states_ll() {
+    struct node *temp;
+
+    while (start != NULL) {
+        temp = start;
+        start = start->next;
+
+        free(temp);
+    }
 }
 
 int tidy_signal(void) {
@@ -134,15 +172,21 @@ int tidy_signal(void) {
 }
 
 void get_m_code(char *m_code, int max_word_len) {
-    int offset, on_dur, m_code_i, i;
+    int offset, on_dur, m_code_i;
+    struct node *temp;
+    if (start == NULL || start->next == NULL) {
+        return;
+    }
+
+    temp = start->next;
 
     on_dur = 0;
     m_code_i = 0;
+    while ((temp != NULL) && (m_code_i < max_word_len)) {
 
-    for (i = 0; i < state_node_count; i++) {
-        offset = states[i].offset;
+        offset = temp->st.offset;
 
-        if (states[i].is_on == '0') {
+        if (temp->st.is_on == '0') {
             on_dur += offset;
         } else {
             if (offset <= EPS_ERR) {
@@ -159,12 +203,9 @@ void get_m_code(char *m_code, int max_word_len) {
                 }
                 on_dur = 0;
                 m_code_i++;
-                if (m_code_i == max_word_len) {
-                    break;
-                }
             }
         }
-
+        temp = temp->next;
     }
 
     if (m_code_i < max_word_len) {
@@ -208,7 +249,13 @@ void listen(char *heard_word, int max_word_len) {
     while (tidy_signal());
     e_ad_scan_off();
     get_m_code(heard_word, max_word_len);
+    sprintf(err_message, "snc::%d A\n", state_node_count);
+    e_send_uart1_char(err_message, strlen(err_message));
+    while (e_uart1_sending());
+    delete_states_ll();
     LED2 = 0;
 }
 
+
 #pragma clang diagnostic pop
+*/
