@@ -16,7 +16,7 @@
 
 #define SIM_THRESHOLD 80
 #define MAX_WORD_LEN 12
-#define EPOCH_COUNT 60
+#define EPOCH_COUNT 61
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "EndlessLoop"
@@ -31,7 +31,7 @@ struct word_node {
 
 struct word_node memory[EPOCH_COUNT * 2];
 
-int probability_arr[EPOCH_COUNT * 2];
+int probability_arr[EPOCH_COUNT * 3];
 
 int get_len(const char *arr, int limit) {
     int len;
@@ -143,10 +143,8 @@ void choose_random_word(char *result) {
     }
 }
 
-void send_words_memory_contents() {
+void send_words_memory_contents(char *word_str, char *line) {
     int i;
-    char word_str[MAX_WORD_LEN + 2];
-    char line[MAX_WORD_LEN + 9];
 
     for (i = 0; i < word_node_count; i++) {
         sprintf(word_str, "%s", memory[i].word);
@@ -158,10 +156,7 @@ void send_words_memory_contents() {
     }
 }
 
-void send_word_message(char *word, int action) {
-    char word_str[MAX_WORD_LEN + 2];
-    char line[MAX_WORD_LEN + 9];
-
+void send_word_message(char *word_str, char *line, char *word, int action) {
     sprintf(word_str, "%s", word);
     word_str[MAX_WORD_LEN] = '\0';
 
@@ -196,8 +191,10 @@ int main(void) {
 
     struct word_node wn;
 
-    while (1) {
+    char word_str[MAX_WORD_LEN + 2];
+    char line[MAX_WORD_LEN + 9];
 
+    while (1) {
         // get command from PC bluetooth
         i = 0, c = 0;
         do {
@@ -213,7 +210,7 @@ int main(void) {
             case 'i':
                 // stay idle
                 // notify PC that I'm done
-                sprintf(message, "ok-i ABX\n");
+                sprintf(message, "ok-i X\n");
                 e_send_uart1_char(message, strlen(message));
                 while (e_uart1_sending());
                 break;
@@ -222,52 +219,32 @@ int main(void) {
                 for (i = 0; i < MAX_WORD_LEN; i++) {
                     heard_word[i] = '0';
                 }
-
-                sprintf(message, "listen A\n");
-                e_send_uart1_char(message, strlen(message));
-                while (e_uart1_sending());
                 // listen for the spoken word
                 listen(heard_word, MAX_WORD_LEN);
-
-                sprintf(message, "listen done B\n");
-                e_send_uart1_char(message, strlen(message));
-                while (e_uart1_sending());
-
                 if (heard_word[0] == '0') {
-                    sprintf(message, "zero word X\n");
-                    e_send_uart1_char(message, strlen(message));
-                    while (e_uart1_sending());
                     choose_random_word(heard_word);
                 }
-
+                // insert heard word to memory
                 for (i = 0; i < MAX_WORD_LEN; i++) {
                     wn.word[i] = heard_word[i];
                 }
                 wn.count = 1;
-                // insert heard word to memory
                 num_words_in_memory += insert_word_node(wn);
-
-                send_words_memory_contents();
-                send_word_message(heard_word, 1);
+                // send log to PC
+                send_words_memory_contents(word_str, line);
+                send_word_message(word_str, line, heard_word, 1);
                 break;
             case 's': // speak
                 // choose a random word from memory
                 choose_random_word(random_chosen_word);
                 // speak the chosen word
-                sprintf(message, "speak A\n");
-                e_send_uart1_char(message, strlen(message));
-                while (e_uart1_sending());
                 talk(random_chosen_word, MAX_WORD_LEN);
-
-                sprintf(message, "speak done B\n");
-                e_send_uart1_char(message, strlen(message));
-                while (e_uart1_sending());
-
-                send_words_memory_contents();
-                send_word_message(random_chosen_word, 2);
+                // send log to PC
+                send_words_memory_contents(word_str, line);
+                send_word_message(word_str, line, random_chosen_word, 2);
                 break;
             default:
-                // default: echo the command back
+                // default: echo command
                 // notify PC that I'm done
                 if (def_comm_count == 2) {
                     // got a random num from pc
@@ -281,7 +258,7 @@ int main(void) {
                     num_words_in_memory += insert_word_node(wn);
                 }
                 def_comm_count++;
-                strcat(command, "ABX\n");
+                strcat(command, "X\n");
                 e_send_uart1_char(command, strlen(command));
                 while (e_uart1_sending());
                 break;

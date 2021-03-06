@@ -150,15 +150,16 @@ void get_m_code(char *m_code, int max_word_len) {
             } else {
                 if (on_dur >= L_DUR) {
                     m_code[m_code_i] = '2';
+                    m_code_i++;
                 } else if (on_dur >= S_DUR) {
                     m_code[m_code_i] = '1';
+                    m_code_i++;
                 } else {
                     //return -1;
-                    return;
                     // m_code[m_code_i] = 1;
                 }
                 on_dur = 0;
-                m_code_i++;
+                // m_code_i++;
                 if (m_code_i == max_word_len) {
                     break;
                 }
