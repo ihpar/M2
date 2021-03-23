@@ -15,8 +15,9 @@
 #include "listen.h"
 
 #define SIM_THRESHOLD 80
-#define MAX_WORD_LEN 12
+#define MAX_WORD_LEN 8
 #define EPOCH_COUNT 61
+#define MEMORY_SIZE 10
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "EndlessLoop"
@@ -29,9 +30,10 @@ struct word_node {
     int count;
 };
 
-struct word_node memory[EPOCH_COUNT * 2];
+struct word_node memory[MEMORY_SIZE];
 
-int probability_arr[EPOCH_COUNT * 3];
+// int probability_arr[EPOCH_COUNT * 3];
+int probability_arr[3];
 
 int get_len(const char *arr, int limit) {
     int len;
@@ -69,6 +71,43 @@ int find_similarity(char *w1, char *w2) {
 
     float similarity_percentage = 100 * ((float) (w1_len - distance) / (float) w1_len);
     return (int) similarity_percentage;
+}
+
+void insert_word_node_to_queue(struct word_node wn) {
+    int i, j, idx, sim_score, max_sim_score;
+
+    max_sim_score = 0;
+    for (i = 0; i < word_node_count; i++) {
+        // find most similar word in memory
+        sim_score = find_similarity(memory[i].word, wn.word);
+        if (sim_score > max_sim_score) {
+            max_sim_score = sim_score;
+            idx = i;
+        }
+    }
+
+    if (max_sim_score >= SIM_THRESHOLD) {
+        // if the most similar word is acceptable, add it to queue again
+        for (i = 0; i < MAX_WORD_LEN; i++) {
+            wn.word[i] = memory[idx].word[i];
+        }
+    }
+
+    // add the new word to the end of the queue
+    if (word_node_count == MEMORY_SIZE) {
+        // shift the queue
+        for (j = 0; j < MEMORY_SIZE - 1; j++) {
+            for (i = 0; i < MAX_WORD_LEN; i++) {
+                memory[j].word[i] = memory[j + 1].word[i];
+            }
+        }
+    } else {
+        // append to the end of the queue
+        for (i = 0; i < MAX_WORD_LEN; i++) {
+            memory[word_node_count].word[i] = wn.word[i];
+        }
+        word_node_count++;
+    }
 }
 
 int insert_word_node(struct word_node wn) {
@@ -119,6 +158,22 @@ void create_random_word(char *word, int max_syl_len, int complexity) {
     }
 }
 
+void create_random_word_non_grouped(char *word, int word_len) {
+    int i;
+    char bits[2] = {'1', '2'};
+    for (i = 0; i < word_len; i++) {
+        word[i] = bits[(rand() % 2)];
+    }
+}
+
+void choose_random_word_from_queue(char *result) {
+    int i, chosen_index;
+    chosen_index = rand() % word_node_count;
+    for (i = 0; i < MAX_WORD_LEN; i++) {
+        result[i] = memory[chosen_index].word[i];
+    }
+}
+
 void choose_random_word(char *result) {
     int total_weights = 0;
     int i, j, k;
@@ -149,7 +204,8 @@ void send_words_memory_contents(char *word_str, char *line) {
     for (i = 0; i < word_node_count; i++) {
         sprintf(word_str, "%s", memory[i].word);
         word_str[MAX_WORD_LEN] = '\0';
-        sprintf(line, "M:%s-%d\n", word_str, memory[i].count);
+        // sprintf(line, "M:%s-%d\n", word_str, memory[i].count);
+        sprintf(line, "M:%s\n", word_str);
 
         e_send_uart1_char(line, strlen(line));
         while (e_uart1_sending());
@@ -222,22 +278,27 @@ int main(void) {
                 }
                 // listen for the spoken word
                 listen(heard_word, MAX_WORD_LEN);
-                if (heard_word[0] == '0') {
-                    choose_random_word(heard_word);
-                }
-                // insert heard word to memory
-                for (i = 0; i < MAX_WORD_LEN; i++) {
-                    wn.word[i] = heard_word[i];
-                }
-                wn.count = 1;
-                num_words_in_memory += insert_word_node(wn);
-                // send log to PC
+
                 send_words_memory_contents(word_str, line);
-                send_word_message(word_str, line, heard_word, 1);
+
+                if (heard_word[0] == '0') {
+                    // nothing heard, just send terminate message
+                    sprintf(message, "X\n");
+                    e_send_uart1_char(message, strlen(message));
+                    while (e_uart1_sending());
+                } else {
+                    // insert heard word to memory
+                    for (i = 0; i < MAX_WORD_LEN; i++) {
+                        wn.word[i] = heard_word[i];
+                    }
+                    wn.count = 1;
+                    insert_word_node_to_queue(wn);
+                    send_word_message(word_str, line, heard_word, 1);
+                }
                 break;
             case 's': // speak
                 // choose a random word from memory
-                choose_random_word(random_chosen_word);
+                choose_random_word_from_queue(random_chosen_word);
                 // speak the chosen word
                 talk(random_chosen_word, MAX_WORD_LEN);
                 // send log to PC
@@ -254,9 +315,11 @@ int main(void) {
                         rand_seed = -1 * rand_seed;
                     }
                     srand(rand_seed);
-                    create_random_word(wn.word, max_syl_len, complexity);
+                    // create_random_word(wn.word, max_syl_len, complexity);
+                    create_random_word_non_grouped(wn.word, MAX_WORD_LEN);
                     wn.count = 1;
-                    num_words_in_memory += insert_word_node(wn);
+                    // num_words_in_memory += insert_word_node(wn);
+                    insert_word_node_to_queue(wn);
                 }
                 def_comm_count++;
                 strcat(command, "X\n");
