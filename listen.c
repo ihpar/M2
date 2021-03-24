@@ -3,7 +3,6 @@
 
 #include "epuck_ports.h"
 #include "a_d/advance_ad_scan/e_ad_conv.h"
-#include "a_d/advance_ad_scan/e_micro.h"
 #include "my_utils.h"
 #include "uart/e_uart_char.h"
 
@@ -80,6 +79,7 @@ int tidy_signal(void) {
         sprintf(err_message, "watch dog timeout A\n");
         e_send_uart1_char(err_message, strlen(err_message));
         while (e_uart1_sending());
+        stall_ms(10);
         return 0;
     }
 
