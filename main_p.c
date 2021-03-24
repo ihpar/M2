@@ -1,8 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "string.h"
+#include "p30f6014A.h"
+#include "epuck_ports.h"
 #include "uart/e_uart_char.h"
 #include "motor_led/e_init_port.h"
+#include "codec/e_sound.h"
+#include "a_d/advance_ad_scan/e_ad_conv.h"
+#include "a_d/advance_ad_scan/e_micro.h"
+#include "bluetooth/e_bluetooth.h"
 
 #include "my_utils.h"
 #include "talk.h"
@@ -20,6 +26,7 @@ int word_node_count = 0;
 
 struct word_node {
     char word[MAX_WORD_LEN];
+    int count;
 };
 
 struct word_node memory[MEMORY_SIZE];
@@ -121,8 +128,7 @@ void send_words_memory_contents(char *word_str, char *line) {
     for (i = 0; i < word_node_count; i++) {
         sprintf(word_str, "%s", memory[i].word);
         word_str[MAX_WORD_LEN] = '\0';
-        // sprintf(line, "M:%s-%d\n", word_str, memory[i].count);
-        sprintf(line, "M:%s\n", word_str);
+        sprintf(line, "M:%s-%d\n", word_str, memory[i].count);
 
         e_send_uart1_char(line, strlen(line));
         while (e_uart1_sending());
@@ -180,7 +186,6 @@ int main(void) {
             case 'i':
                 // stay idle
                 // notify PC that I'm done
-                stall_ms(10);
                 sprintf(message, "ok-i X\n");
                 e_send_uart1_char(message, strlen(message));
                 while (e_uart1_sending());
@@ -192,11 +197,11 @@ int main(void) {
                 }
                 // listen for the spoken word
                 listen(heard_word, MAX_WORD_LEN);
-                stall_ms(10);
-                send_words_memory_contents(word_str, line);
 
                 if (heard_word[0] == '0') {
-                    // nothing heard, just send terminate message
+                    // did not hear anything
+                    // send log to PC
+                    send_words_memory_contents(word_str, line);
                     sprintf(message, "X\n");
                     e_send_uart1_char(message, strlen(message));
                     while (e_uart1_sending());
@@ -205,17 +210,18 @@ int main(void) {
                     for (i = 0; i < MAX_WORD_LEN; i++) {
                         wn.word[i] = heard_word[i];
                     }
+                    wn.count = 1;
                     insert_word_node_to_queue(wn);
+                    // send log to PC
+                    send_words_memory_contents(word_str, line);
                     send_word_message(word_str, line, heard_word, 1);
                 }
                 break;
             case 's': // speak
                 // choose a random word from memory
                 choose_random_word_from_queue(random_chosen_word);
-                stall_ms(10);
                 // speak the chosen word
                 talk(random_chosen_word, MAX_WORD_LEN);
-                stall_ms(10);
                 // send log to PC
                 send_words_memory_contents(word_str, line);
                 send_word_message(word_str, line, random_chosen_word, 2);
@@ -231,6 +237,7 @@ int main(void) {
                     }
                     srand(rand_seed);
                     create_random_word_non_grouped(wn.word, MAX_WORD_LEN);
+                    wn.count = 1;
                     insert_word_node_to_queue(wn);
                 }
                 def_comm_count++;
