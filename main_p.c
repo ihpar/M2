@@ -132,7 +132,6 @@ void send_words_memory_contents(char *word_str, char *line) {
 
         e_send_uart1_char(line, strlen(line));
         while (e_uart1_sending());
-        stall_ms(10);
     }
 }
 
@@ -157,7 +156,7 @@ int main(void) {
     staller(4);
 
     char message[50];
-    char command[10];
+    char command[100];
     int i, c, rand_seed;
     int def_comm_count = 1;
     char *c_dummy;
