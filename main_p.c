@@ -1,14 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "string.h"
-#include "p30f6014A.h"
-#include "epuck_ports.h"
 #include "uart/e_uart_char.h"
 #include "motor_led/e_init_port.h"
-#include "codec/e_sound.h"
-#include "a_d/advance_ad_scan/e_ad_conv.h"
-#include "a_d/advance_ad_scan/e_micro.h"
-#include "bluetooth/e_bluetooth.h"
 
 #include "my_utils.h"
 #include "talk.h"
@@ -16,7 +10,6 @@
 
 #define SIM_THRESHOLD 80
 #define MAX_WORD_LEN 8
-#define EPOCH_COUNT 61
 #define MEMORY_SIZE 10
 
 #pragma clang diagnostic push
@@ -27,13 +20,9 @@ int word_node_count = 0;
 
 struct word_node {
     char word[MAX_WORD_LEN];
-    int count;
 };
 
 struct word_node memory[MEMORY_SIZE];
-
-// int probability_arr[EPOCH_COUNT * 3];
-int probability_arr[3];
 
 int get_len(const char *arr, int limit) {
     int len;
@@ -110,54 +99,6 @@ void insert_word_node_to_queue(struct word_node wn) {
     }
 }
 
-int insert_word_node(struct word_node wn) {
-    int i, idx, sim_score, max_sim_score;
-
-    max_sim_score = 0;
-    for (i = 0; i < word_node_count; i++) {
-        sim_score = find_similarity(memory[i].word, wn.word);
-        if (sim_score > max_sim_score) {
-            max_sim_score = sim_score;
-            idx = i;
-        }
-    }
-
-    if (max_sim_score >= SIM_THRESHOLD) {
-        // increment most similar word
-        memory[idx].count++;
-        return 0; // no new words added
-    } else {
-        // add new word
-        for (i = 0; i < MAX_WORD_LEN; i++) {
-            memory[word_node_count].word[i] = wn.word[i];
-        }
-        memory[word_node_count].count = 1;
-        word_node_count++;
-        return 1; // 1 new word added
-    }
-}
-
-void create_random_word(char *word, int max_syl_len, int complexity) {
-    int i, j, syl_len;
-    char bits[2] = {'1', '2'};
-
-    int idx = 0;
-    int offset = rand() % 2;
-
-    for (i = 0; i < complexity; i++) {
-        syl_len = 1 + rand() % max_syl_len;
-
-        for (j = 0; j < syl_len; j++) {
-            word[idx] = bits[(offset + i) % 2];
-            idx++;
-        }
-    }
-
-    for (i = idx; i < MAX_WORD_LEN; i++) {
-        word[i] = '0';
-    }
-}
-
 void create_random_word_non_grouped(char *word, int word_len) {
     int i;
     char bits[2] = {'1', '2'};
@@ -169,30 +110,6 @@ void create_random_word_non_grouped(char *word, int word_len) {
 void choose_random_word_from_queue(char *result) {
     int i, chosen_index;
     chosen_index = rand() % word_node_count;
-    for (i = 0; i < MAX_WORD_LEN; i++) {
-        result[i] = memory[chosen_index].word[i];
-    }
-}
-
-void choose_random_word(char *result) {
-    int total_weights = 0;
-    int i, j, k;
-    int chosen_index;
-
-    for (i = 0; i < word_node_count; i++) {
-        total_weights += memory[i].count;
-    }
-
-    k = 0;
-    for (i = 0; i < word_node_count; i++) {
-        for (j = 0; j < memory[i].count; j++) {
-            probability_arr[k] = i;
-            k++;
-        }
-    }
-
-    chosen_index = probability_arr[rand() % total_weights];
-
     for (i = 0; i < MAX_WORD_LEN; i++) {
         result[i] = memory[chosen_index].word[i];
     }
@@ -238,10 +155,6 @@ int main(void) {
     int i, c, rand_seed;
     int def_comm_count = 1;
     char *c_dummy;
-
-    int max_syl_len = 3;
-    int complexity = 4;
-    int num_words_in_memory = 0;
 
     char heard_word[MAX_WORD_LEN];
     char random_chosen_word[MAX_WORD_LEN];
@@ -292,7 +205,6 @@ int main(void) {
                     for (i = 0; i < MAX_WORD_LEN; i++) {
                         wn.word[i] = heard_word[i];
                     }
-                    wn.count = 1;
                     insert_word_node_to_queue(wn);
                     send_word_message(word_str, line, heard_word, 1);
                 }
@@ -318,10 +230,7 @@ int main(void) {
                         rand_seed = -1 * rand_seed;
                     }
                     srand(rand_seed);
-                    // create_random_word(wn.word, max_syl_len, complexity);
                     create_random_word_non_grouped(wn.word, MAX_WORD_LEN);
-                    wn.count = 1;
-                    // num_words_in_memory += insert_word_node(wn);
                     insert_word_node_to_queue(wn);
                 }
                 def_comm_count++;
