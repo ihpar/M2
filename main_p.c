@@ -267,6 +267,7 @@ int main(void) {
             case 'i':
                 // stay idle
                 // notify PC that I'm done
+                stall_ms(10);
                 sprintf(message, "ok-i X\n");
                 e_send_uart1_char(message, strlen(message));
                 while (e_uart1_sending());
@@ -278,7 +279,7 @@ int main(void) {
                 }
                 // listen for the spoken word
                 listen(heard_word, MAX_WORD_LEN);
-
+                stall_ms(10);
                 send_words_memory_contents(word_str, line);
 
                 if (heard_word[0] == '0') {
@@ -299,8 +300,10 @@ int main(void) {
             case 's': // speak
                 // choose a random word from memory
                 choose_random_word_from_queue(random_chosen_word);
+                stall_ms(10);
                 // speak the chosen word
                 talk(random_chosen_word, MAX_WORD_LEN);
+                stall_ms(10);
                 // send log to PC
                 send_words_memory_contents(word_str, line);
                 send_word_message(word_str, line, random_chosen_word, 2);
