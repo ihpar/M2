@@ -122,31 +122,49 @@ void choose_random_word_from_queue(char *result) {
     }
 }
 
-void send_words_memory_contents(char *word_str, char *line) {
-    int i;
+void send_everything(char *message, char *word, int action) {
+    int i, j, k;
+    j = 0;
 
     for (i = 0; i < word_node_count; i++) {
-        sprintf(word_str, "%s", memory[i].word);
-        word_str[MAX_WORD_LEN] = '\0';
-        sprintf(line, "M:%s-%d\n", word_str, memory[i].count);
-
-        e_send_uart1_char(line, strlen(line));
-        while (e_uart1_sending());
+        message[j] = 'M';
+        j++;
+        message[j] = ':';
+        j++;
+        for (k = 0; k < MAX_WORD_LEN; k++) {
+            message[j] = memory[i].word[k];
+            j++;
+        }
+        message[j] = '\n';
+        j++;
     }
-}
-
-void send_word_message(char *word_str, char *line, char *word, int action) {
-    sprintf(word_str, "%s", word);
-    word_str[MAX_WORD_LEN] = '\0';
-
     if (action == 1) {
-        sprintf(line, "LW:%sX\n", word_str);
+        // listen
+        message[j] = 'L';
+    } else {
+        // speak
+        message[j] = 'S';
     }
-    if (action == 2) {
-        sprintf(line, "SW:%sX\n", word_str);
+    j++;
+    message[j] = 'W';
+    j++;
+    message[j] = ':';
+    j++;
+
+    if (word[0] != '0') {
+        for (i = 0; i < MAX_WORD_LEN; i++) {
+            message[j] = word[i];
+            j++;
+        }
     }
 
-    e_send_uart1_char(line, strlen(line));
+    message[j] = 'X';
+    j++;
+    message[j] = '\n';
+    j++;
+    message[j] = '\0';
+
+    e_send_uart1_char(message, strlen(message));
     while (e_uart1_sending());
 }
 
@@ -163,11 +181,9 @@ int main(void) {
 
     char heard_word[MAX_WORD_LEN];
     char random_chosen_word[MAX_WORD_LEN];
+    char everything_buffer[11 * (MAX_WORD_LEN + 4)];
 
     struct word_node wn;
-
-    char word_str[MAX_WORD_LEN + 2];
-    char line[MAX_WORD_LEN + 9];
 
     while (1) {
         // get command from PC bluetooth
@@ -177,7 +193,7 @@ int main(void) {
                 c = command[i];
                 i++;
             }
-        } while (((char) c != '\n') && ((char) c != '\x0d'));
+        } while (((char) c != '\n') && ((char) c != '\x0d') && (i < 99));
         command[i] = '\0';
 
         // process command
@@ -197,24 +213,14 @@ int main(void) {
                 // listen for the spoken word
                 listen(heard_word, MAX_WORD_LEN);
 
-                if (heard_word[0] == '0') {
-                    // did not hear anything
-                    // send log to PC
-                    send_words_memory_contents(word_str, line);
-                    sprintf(message, "X\n");
-                    e_send_uart1_char(message, strlen(message));
-                    while (e_uart1_sending());
-                } else {
-                    // insert heard word to memory
+                if (heard_word[0] != '0') {
                     for (i = 0; i < MAX_WORD_LEN; i++) {
                         wn.word[i] = heard_word[i];
                     }
                     wn.count = 1;
                     insert_word_node_to_queue(wn);
-                    // send log to PC
-                    send_words_memory_contents(word_str, line);
-                    send_word_message(word_str, line, heard_word, 1);
                 }
+                send_everything(everything_buffer, heard_word, 1);
                 break;
             case 's': // speak
                 // choose a random word from memory
@@ -222,8 +228,7 @@ int main(void) {
                 // speak the chosen word
                 talk(random_chosen_word, MAX_WORD_LEN);
                 // send log to PC
-                send_words_memory_contents(word_str, line);
-                send_word_message(word_str, line, random_chosen_word, 2);
+                send_everything(everything_buffer, random_chosen_word, 2);
                 break;
             default:
                 // default: echo command
