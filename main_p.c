@@ -160,8 +160,6 @@ void send_everything(char *message, char *word, int action) {
 
     message[j] = 'X';
     j++;
-    message[j] = '\n';
-    j++;
     message[j] = '\0';
 
     e_send_uart1_char(message, strlen(message));
@@ -171,42 +169,44 @@ void send_everything(char *message, char *word, int action) {
 int main(void) {
     e_init_port();
     e_init_uart1();
+    e_init_sound();
+
     staller(4);
 
-    char message[50];
+    char message[100];
     char command[100];
-    int i, c, rand_seed;
-    int def_comm_count = 1;
-    char *c_dummy;
+    int i, ci, rand_seed, r_pos;
+    char car, cf;
 
     char heard_word[MAX_WORD_LEN];
     char random_chosen_word[MAX_WORD_LEN];
     char everything_buffer[11 * (MAX_WORD_LEN + 4)];
+    int random_seeded = 0;
 
     struct word_node wn;
 
+    int char_pos = 0;
     while (1) {
-        // get command from PC bluetooth
-        i = 0, c = 0;
-        do {
-            if (e_getchar_uart1(&command[i])) {
-                c = command[i];
-                i++;
-            }
-        } while (((char) c != '\n') && ((char) c != '\x0d') && (i < 99));
-        command[i] = '\0';
+        while (!e_ischar_uart1());
+        e_getchar_uart1(&car);
 
-        // process command
-        switch (command[0]) {
-            case 'i':
-                // stay idle
-                // notify PC that I'm done
-                sprintf(message, "ok-i X\n");
+        if (car == 'T') {
+            cf = command[0];
+            // check command from PC
+            if (cf == 'i') {
+                sprintf(message, "%s X", "ok-i");
                 e_send_uart1_char(message, strlen(message));
                 while (e_uart1_sending());
-                break;
-            case 'l': // listen
-                // init "hearing" buffer
+            } else if (cf == 's') {
+                // command is to speak
+                // choose a random word from memory
+                choose_random_word_from_queue(random_chosen_word);
+                // speak the chosen word
+                talk(random_chosen_word, MAX_WORD_LEN);
+                // send log to PC
+                send_everything(everything_buffer, random_chosen_word, 2);
+            } else if (cf == 'l') {
+                // command is to listen
                 for (i = 0; i < MAX_WORD_LEN; i++) {
                     heard_word[i] = '0';
                 }
@@ -221,34 +221,33 @@ int main(void) {
                     insert_word_node_to_queue(wn);
                 }
                 send_everything(everything_buffer, heard_word, 1);
-                break;
-            case 's': // speak
-                // choose a random word from memory
-                choose_random_word_from_queue(random_chosen_word);
-                // speak the chosen word
-                talk(random_chosen_word, MAX_WORD_LEN);
-                // send log to PC
-                send_everything(everything_buffer, random_chosen_word, 2);
-                break;
-            default:
-                // default: echo command
-                // notify PC that I'm done
-                if (def_comm_count == 2) {
-                    // got a random num from pc
-                    rand_seed = (int) strtol(command, &c_dummy, 10);
-                    if (rand_seed < 0) {
-                        rand_seed = -1 * rand_seed;
-                    }
+            } else if (cf == 'r') {
+
+                rand_seed = 0;
+                for (r_pos = char_pos - 1; r_pos > 0; r_pos--) {
+                    ci = command[r_pos] - '0';
+                    rand_seed += rand_seed * 10 + ci;
+                }
+                if (!random_seeded) {
                     srand(rand_seed);
                     create_random_word_non_grouped(wn.word, MAX_WORD_LEN);
                     wn.count = 1;
                     insert_word_node_to_queue(wn);
+                    random_seeded = 1;
                 }
-                def_comm_count++;
-                strcat(command, "X\n");
-                e_send_uart1_char(command, strlen(command));
+                sprintf(message, "seed: %dX", rand_seed);
+                e_send_uart1_char(message, strlen(message));
                 while (e_uart1_sending());
-                break;
+            } else {
+                sprintf(message, "%s X", "nothing");
+                e_send_uart1_char(message, strlen(message));
+                while (e_uart1_sending());
+            }
+
+            char_pos = 0;
+        } else {
+            command[char_pos] = car;
+            char_pos++;
         }
 
     }

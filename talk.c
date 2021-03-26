@@ -15,13 +15,13 @@
 extern int e_dci_unavailable;
 
 void talk(char *word, int max_word_len) {
-    e_init_sound();
-    e_ad_scan_off();
+
+    //e_ad_scan_off();
     staller(1);
 
     int i;
     for (i = 0; i < max_word_len; i++) {
-        while (e_dci_unavailable);
+        // while (e_dci_unavailable);
         if (word[i] == '2') {
             e_play_sound(SAMPLE_START, LONG_BEEPD);     // long beep
         }
@@ -34,7 +34,7 @@ void talk(char *word, int max_word_len) {
         stall_ms(SILENCE_CODES);
     }
 
-    e_close_sound();
+    // e_close_sound();
     stall_ms(SILENCE_LETTERS);
 }
 
