@@ -15,7 +15,8 @@
 #include "listen.h"
 
 #define SIM_THRESHOLD 80
-#define MAX_WORD_LEN 8
+#define MAX_WORD_LEN 12
+#define INITIAL_WORD_LEN 8
 #define MEMORY_SIZE 10
 
 #pragma clang diagnostic push
@@ -97,6 +98,10 @@ void insert_word_node_to_queue(struct word_node wn) {
                 memory[j].word[i] = memory[j + 1].word[i];
             }
         }
+        // append new word to the end
+        for (i = 0; i < MAX_WORD_LEN; i++) {
+            memory[word_node_count - 1].word[i] = wn.word[i];
+        }
     } else {
         // append to the end of the queue
         for (i = 0; i < MAX_WORD_LEN; i++) {
@@ -106,11 +111,14 @@ void insert_word_node_to_queue(struct word_node wn) {
     }
 }
 
-void create_random_word_non_grouped(char *word, int word_len) {
+void create_random_word_non_grouped(char *word, int word_len, int total_len) {
     int i;
     char bits[2] = {'1', '2'};
     for (i = 0; i < word_len; i++) {
         word[i] = bits[(rand() % 2)];
+    }
+    for (i = word_len; i < total_len; i++) {
+        word[i] = '0';
     }
 }
 
@@ -230,7 +238,7 @@ int main(void) {
                 }
                 if (!random_seeded) {
                     srand(rand_seed);
-                    create_random_word_non_grouped(wn.word, MAX_WORD_LEN);
+                    create_random_word_non_grouped(wn.word, INITIAL_WORD_LEN, MAX_WORD_LEN);
                     wn.count = 1;
                     insert_word_node_to_queue(wn);
                     random_seeded = 1;
