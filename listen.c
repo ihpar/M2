@@ -77,9 +77,9 @@ int tidy_signal(void) {
     }
 
     if (watch_dog > 500) {
-        sprintf(err_message, "watch dog timeout A\n");
-        e_send_uart1_char(err_message, strlen(err_message));
-        while (e_uart1_sending());
+        // sprintf(err_message, "watch dog timeout A\n");
+        // e_send_uart1_char(err_message, strlen(err_message));
+        // while (e_uart1_sending());
         return 0;
     }
 
@@ -197,17 +197,14 @@ void init_listening() {
     LED1 = 0;
     LED2 = 0;
 
-    e_ad_scan_on();
-    e_init_ad_scan(MICRO_ONLY);
-
-    stall_ms(300000);
+    stall_ms(100000);
 }
 
 void listen(char *heard_word, int max_word_len) {
     init_listening();
     LED2 = 1;
     while (tidy_signal());
-    e_ad_scan_off();
+    // e_ad_scan_off();
     get_m_code(heard_word, max_word_len);
     LED2 = 0;
 }

@@ -178,6 +178,8 @@ int main(void) {
     e_init_port();
     e_init_uart1();
     e_init_sound();
+    e_init_ad_scan(MICRO_ONLY);
+    e_ad_scan_on();
 
     staller(4);
 
